@@ -1,9 +1,10 @@
-from flask import Flask, request, redirect, url_for, g
+from flask import Flask, request, redirect, url_for, g, jsonify
 import requests
 import jwt
 from datetime import datetime, timedelta
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import func
+from dataclasses import dataclass
 
 JWT_KEY = ""
 GITHUB_CLIENT_ID = ""
@@ -17,9 +18,18 @@ app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 db = SQLAlchemy(app)
 
 
+@dataclass
 class User(db.Model):
 
     __tablename__ = "users"
+
+    id: int
+    github_id: str
+    github_username: str
+    github_userurl: str
+    created_at: datetime
+    updated_at: datetime
+    deleted_at: datetime
 
     id = db.Column(db.Integer, primary_key=True)
     github_id = db.Column(db.String(128), unique=True, nullable=False)
@@ -30,7 +40,51 @@ class User(db.Model):
     deleted_at = db.Column(db.DateTime)
 
     def __repr__(self):
-        return "<User %r>" % self.github_username
+        return (
+            "<User (id='%s', github_id='%s', github_username='%s', github_userurl='%s', created_at='%s', updated_at='%s', deleted_at='%s')>"
+            % (
+                self.id,
+                self.github_id,
+                self.github_username,
+                self.github_userurl,
+                self.created_at,
+                self.updated_at,
+                self.deleted_at,
+            )
+        )
+
+
+@dataclass
+class Task(db.Model):
+
+    __tablename__ = "tasks"
+
+    id: int
+    user_id: int
+    title: str
+    created_at: datetime
+    updated_at: datetime
+    deleted_at: datetime
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, nullable=False)
+    title = db.Column(db.String(255))
+    created_at = db.Column(db.DateTime, nullable=False)
+    updated_at = db.Column(db.DateTime)
+    deleted_at = db.Column(db.DateTime)
+
+    def __repr__(self):
+        return (
+            "<Task (id='%s', user_id='%s', title='%s', created_at='%s', updated_at='%s', deleted_at='%s')>"
+            % (
+                self.id,
+                self.user_id,
+                self.title,
+                self.created_at,
+                self.updated_at,
+                self.deleted_at,
+            )
+        )
 
 
 @app.before_request
@@ -63,6 +117,55 @@ def login():
         "https://github.com/login/oauth/authorize?client_id=" + GITHUB_CLIENT_ID,
         code=302,
     )
+
+
+@app.get("/list-tasks")
+def list_tasks():
+    modifier = request.args
+    page = modifier.get("page", 1)
+    limit = modifier.get("limit", 10)
+
+    tasks = db.session.query(Task.id, Task.title).paginate(int(page), int(limit), False)
+
+    arr = []
+    for i in tasks.items:
+        arr.append(i._asdict())
+
+    return (jsonify(arr), 200)
+
+
+@app.get("/task/<task_id>")
+def task(task_id):
+
+    task = (
+        Task.query.with_entities(Task.id, Task.title)
+        .filter(Task.id == task_id, Task.deleted_at == None)
+        .one_or_none()
+    )
+
+    if task is None:
+        task = {}
+    else:
+        task = task._asdict()
+
+    return (jsonify(task), 200)
+
+
+@app.post("/add-task")
+def add_task():
+
+    data = request.form
+    new_task = Task(
+        user_id=g.user_id,
+        title=data.get("title", ""),
+        created_at=func.now(),
+    )
+
+    db.session.add(new_task)
+    db.session.commit()
+    db.session.refresh(new_task)
+
+    return ({"message": "Successfully add new task!", "id": new_task.id}, 200)
 
 
 @app.get("/callback")
