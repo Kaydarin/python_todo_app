@@ -174,6 +174,54 @@ def add_task():
     return ({"message": "Successfully add new task!", "id": new_task.id}, 200)
 
 
+@app.patch("/update-task")
+def update_task():
+    data = request.form
+
+    task_id = data.get("id", None)
+    title = data.get("title", None)
+
+    if task_id is None or title is None:
+        return ("Missing attribute", 422)
+
+    data_to_update = {"title": title, "updated_at": func.now()}
+
+    updated = (
+        db.session.query(Task)
+        .filter(Task.id == task_id, Task.user_id == g.user_id, Task.deleted_at == None)
+        .update(data_to_update)
+    )
+    db.session.commit()
+
+    if updated == 1:
+        return ({"message": "Successfully updated task!"}, 200)
+    else:
+        return ({"message": "Nothing updated"}, 202)
+
+
+@app.delete("/remove-task")
+def delete_task():
+
+    data = request.form
+
+    task_id = data.get("id", None)
+
+    if task_id is None:
+        return ("Missing attribute", 422)
+
+    deleted = (
+        db.session.query(Task)
+        .filter(Task.id == task_id, Task.user_id == g.user_id, Task.deleted_at == None)
+        .update({"deleted_at": func.now()})
+    )
+    db.session.commit()
+
+    if deleted == 1:
+        return ({"message": "Successfully delete task!"}, 200)
+    else:
+        return ({"message": "Nothing deleted"}, 202)
+
+
 @app.get("/callback")
 def login_callback():
     code = request.args.get("code")
