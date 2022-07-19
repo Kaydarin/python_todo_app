@@ -14,6 +14,7 @@ MYSQL_CONN = ""
 app = Flask(__name__)
 app.config["SQLALCHEMY_DATABASE_URI"] = MYSQL_CONN
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+app.config["SQLALCHEMY_ECHO"] = False
 
 db = SQLAlchemy(app)
 
@@ -67,7 +68,7 @@ class Task(db.Model):
     deleted_at: datetime
 
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
     title = db.Column(db.String(255))
     created_at = db.Column(db.DateTime, nullable=False)
     updated_at = db.Column(db.DateTime)
@@ -155,9 +156,14 @@ def task(task_id):
 def add_task():
 
     data = request.form
+    title = data.get("title", None)
+
+    if title is None:
+        return ("Missing attribute", 422)
+
     new_task = Task(
         user_id=g.user_id,
-        title=data.get("title", ""),
+        title=title,
         created_at=func.now(),
     )
 
@@ -225,7 +231,10 @@ def login_callback():
         encoded = jwt.encode({"id": user.id, "exp": expiry}, JWT_KEY, algorithm="HS256")
 
         return (
-            {"message": "Login success", "token": encoded},
+            {
+                "message": "Login success!, welcome " + user.github_username,
+                "token": encoded,
+            },
             {"Authorization": "Bearer " + encoded},
         )
 
