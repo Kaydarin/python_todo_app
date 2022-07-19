@@ -459,6 +459,59 @@ def update_todo():
         return ({"message": "Nothing updated"}, 202)
 
 
+@app.patch("/mark-todo")
+def mark_todo():
+    data = request.form
+
+    todo_id = data.get("id", None)
+    done = data.get("done", None)
+
+    if todo_id is None or done is None:
+        return ("Missing attribute", 422)
+
+    if done.isdigit() is False:
+        return ("Invalid value", 400)
+    else:
+        done = int(done)
+        if done not in [0, 1]:
+            return ("Invalid value", 400)
+
+    todo = (
+        Todo.query.with_entities(Todo.id, Todo.task_id, Todo.is_done)
+        .join(Task, Task.id == Todo.task_id)
+        .filter(
+            Todo.id == todo_id,
+            Task.user_id == g.user_id,
+            Task.deleted_at == None,
+            Todo.deleted_at == None,
+        )
+        .one_or_none()
+    )
+
+    if todo is None:
+        return ({"message": "Todo is not exist"}, 400)
+
+    if todo._asdict()["is_done"] == done:
+        return ({"message": "Nothing updated"}, 202)
+
+    data_to_update = {"is_done": done, "updated_at": func.now()}
+
+    updated = (
+        db.session.query(Todo)
+        .filter(
+            Todo.id == todo_id,
+            Todo.deleted_at == None,
+        )
+        .update(data_to_update)
+    )
+    db.session.commit()
+
+    if updated == 1:
+        return ({"message": "Successfully mark todo!"}, 200)
+    else:
+        return ({"message": "Nothing updated"}, 202)
+
+
 @app.delete("/remove-todo")
 def delete_todo():
     data = request.form
