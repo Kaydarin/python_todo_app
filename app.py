@@ -88,6 +88,42 @@ class Task(db.Model):
         )
 
 
+@dataclass
+class Todo(db.Model):
+
+    __tablename__ = "todos"
+
+    id: int
+    task_id: int
+    title: str
+    is_done: bool
+    created_at: datetime
+    updated_at: datetime
+    deleted_at: datetime
+
+    id = db.Column(db.Integer, primary_key=True)
+    task_id = db.Column(db.Integer, db.ForeignKey("tasks.id"), nullable=False)
+    title = db.Column(db.String(255))
+    is_done = db.Column(db.Boolean, default=False)
+    created_at = db.Column(db.DateTime, nullable=False)
+    updated_at = db.Column(db.DateTime)
+    deleted_at = db.Column(db.DateTime)
+
+    def __repr__(self):
+        return (
+            "<Todo (id='%s', task_id='%s', title='%s', is_done='%s', created_at='%s', updated_at='%s', deleted_at='%s')>"
+            % (
+                self.id,
+                self.task_id,
+                self.title,
+                self.is_done,
+                self.created_at,
+                self.updated_at,
+                self.deleted_at,
+            )
+        )
+
+
 @app.before_request
 def before_request():
     if (
@@ -220,6 +256,83 @@ def delete_task():
         return ({"message": "Successfully delete task!"}, 200)
     else:
         return ({"message": "Nothing deleted"}, 202)
+
+
+@app.get("/list-todo")
+def list_todo():
+    modifier = request.args
+    page = modifier.get("page", 1)
+    limit = modifier.get("limit", 10)
+
+    tasks = (
+        db.session.query(Todo.id, Todo.title, Todo.is_done)
+        .join(Task, Task.id == Todo.task_id)
+        .filter(
+            Task.user_id == g.user_id,
+            Task.deleted_at == None,
+            Todo.deleted_at == None,
+        )
+        .paginate(int(page), int(limit), False)
+    )
+
+    arr = []
+    for i in tasks.items:
+        arr.append(i._asdict())
+
+    return (jsonify(arr), 200)
+
+
+@app.get("/todo/<todo_id>")
+def todo(todo_id):
+    todo = (
+        Todo.query.with_entities(Todo.id, Todo.task_id, Todo.title, Todo.is_done)
+        .join(Task, Task.id == Todo.task_id)
+        .filter(
+            Todo.id == todo_id,
+            Task.user_id == g.user_id,
+            Task.deleted_at == None,
+            Todo.deleted_at == None,
+        )
+        .one_or_none()
+    )
+
+    if todo is None:
+        todo = {}
+    else:
+        todo = todo._asdict()
+
+    return (jsonify(todo), 200)
+
+
+@app.post("/add-todo")
+def add_todo():
+    data = request.form
+    task_id = data.get("task_id", None)
+    title = data.get("title", None)
+
+    if task_id is None or title is None:
+        return ("Missing attribute", 422)
+
+    task = (
+        Task.query.with_entities(Task.id)
+        .filter(Task.id == task_id, Task.user_id == g.user_id, Task.deleted_at == None)
+        .one_or_none()
+    )
+
+    if task is None:
+        return ({"message": "Task is not exist"}, 400)
+
+    new_todo = Todo(
+        task_id=task_id,
+        title=title,
+        created_at=func.now(),
+    )
+
+    db.session.add(new_todo)
+    db.session.commit()
+    db.session.refresh(new_todo)
+
+    return ({"message": "Successfully add new todo!", "id": new_todo.id}, 200)
 
 
 @app.get("/callback")
