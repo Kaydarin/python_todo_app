@@ -162,11 +162,64 @@ def list_tasks():
     page = modifier.get("page", 1)
     limit = modifier.get("limit", 10)
 
-    tasks = db.session.query(Task.id, Task.title).paginate(int(page), int(limit), False)
+    tasks = (
+        db.session.query(
+            Task.id,
+            Task.title,
+            Todo.id.label("todo_id"),
+            Todo.title.label("todo_title"),
+            Todo.is_done,
+        )
+        .join(Todo, Todo.task_id == Task.id, isouter=True)
+        .filter(
+            Task.user_id == g.user_id, Task.deleted_at == None, Todo.deleted_at == None
+        )
+        .paginate(int(page), int(limit), False)
+    )
 
     arr = []
     for i in tasks.items:
-        arr.append(i._asdict())
+        data = i._asdict()
+
+        task = next((val for val in arr if val["id"] == data["id"]), None)
+
+        if task is None:
+            task_remapped = {
+                "id": data["id"],
+                "title": data["title"],
+            }
+
+            if data["todo_id"] is not None:
+                task_remapped = {
+                    **task_remapped,
+                    "todos": [
+                        {
+                            "id": data["todo_id"],
+                            "title": data["todo_title"],
+                            "is_done": data["is_done"],
+                        }
+                    ],
+                }
+            else:
+                task_remapped = {
+                    **task_remapped,
+                    "todos": [],
+                }
+
+            arr.append(task_remapped)
+        else:
+            todo = next(
+                (val for val in task["todos"] if val["id"] == data["todo_id"]),
+                None,
+            )
+            if todo is None:
+                task["todos"].append(
+                    {
+                        "id": data["todo_id"],
+                        "title": data["todo_title"],
+                        "is_done": data["is_done"],
+                    }
+                )
 
     return (jsonify(arr), 200)
 
@@ -175,17 +228,45 @@ def list_tasks():
 def task(task_id):
 
     task = (
-        Task.query.with_entities(Task.id, Task.title)
-        .filter(Task.id == task_id, Task.deleted_at == None)
-        .one_or_none()
+        Task.query.with_entities(
+            Task.id,
+            Task.title,
+            Todo.id.label("todo_id"),
+            Todo.title.label("todo_title"),
+            Todo.is_done,
+        )
+        .join(Todo, Todo.task_id == Task.id, isouter=True)
+        .filter(
+            Task.id == task_id,
+            Task.user_id == g.user_id,
+            Task.deleted_at == None,
+            Todo.deleted_at == None,
+        )
+        .all()
     )
 
-    if task is None:
-        task = {}
-    else:
-        task = task._asdict()
+    mapped = {}
 
-    return (jsonify(task), 200)
+    if len(task) > 0:
+        mapped = {"id": task[0]["id"], "title": task[0]["title"], "todos": []}
+
+        for i in task:
+            data = i._asdict()
+            todo = next(
+                (val for val in mapped["todos"] if val["id"] == data["todo_id"]),
+                None,
+            )
+
+            if data["todo_id"] is not None and todo is None:
+                mapped["todos"].append(
+                    {
+                        "id": data["todo_id"],
+                        "title": data["todo_title"],
+                        "is_done": data["is_done"],
+                    }
+                )
+
+    return (jsonify(mapped), 200)
 
 
 @app.post("/add-task")
