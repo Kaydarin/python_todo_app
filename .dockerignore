@@ -1,5 +1,7 @@
 Dockerfile
+docker-compose.yaml
 .git
+.DS_Store
 /__pycache__/
 /.vscode/
 /venv/

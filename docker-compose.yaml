@@ -1,0 +1,50 @@
+version: '3'
+
+networks:
+  flask:
+
+services:
+  app:
+    image: azimbarcove/python-todo:0.0.1
+    container_name: python-todo
+    restart: always
+    volumes:
+      - .:/python-todo
+    ports:
+      - 5000:5000
+    depends_on:
+      - mysql
+    networks:
+      - flask
+    environment:
+      DB_CONNECTION: mysql
+      DB_HOST: host.docker.internal
+      DB_PORT: 3306
+      DB_DATABASE: python_todo
+      DB_USERNAME: root
+      DB_PASSWORD: root
+      JWT_KEY: get-from-admin
+      GITHUB_CLIENT_ID: get-from-admin
+      GITHUB_CLIENT_SECRET: get-from-admin
+      IS_DOCKER: 1
+      FLASK_ENV: development
+
+  mysql:
+    image: mysql:5.7.30
+    container_name: mysql
+    restart: always
+    ports:
+      - 3306:3306
+    environment:
+      MYSQL_DATABASE: python_todo
+      MYSQL_USER: root
+      MYSQL_PASSWORD: root
+      MYSQL_ROOT_PASSWORD: root
+    command: --init-file /data/application/init.sql
+    volumes:
+      - mysql_volume:/var/lib/mysql
+      - ./init.sql:/data/application/init.sql
+    networks:
+      - flask
+volumes:
+  mysql_volume:
