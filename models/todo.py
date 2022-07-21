@@ -37,3 +37,18 @@ class Todo(db.Model):
                 self.deleted_at,
             )
         )
+
+    @classmethod
+    def with_task(cls, cols, id, user_id):
+        from models import Task
+
+        return (
+            cls.query.with_entities(*cols)
+            .join(Task, Task.id == cls.task_id)
+            .filter(
+                cls.id == id,
+                Task.user_id == user_id,
+                Task.deleted_at == None,
+                cls.deleted_at == None,
+            )
+        )

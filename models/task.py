@@ -34,3 +34,23 @@ class Task(db.Model):
                 self.deleted_at,
             )
         )
+
+    @classmethod
+    def with_todo(cls):
+        from models import Todo
+
+        subquery = (
+            db.session.query(Todo.id, Todo.task_id, Todo.title, Todo.is_done)
+            .filter(Todo.deleted_at == None)
+            .subquery("t")
+        )
+
+        tasks = db.session.query(
+            cls.id,
+            cls.title,
+            subquery.c.id.label("todo_id"),
+            subquery.c.title.label("todo_title"),
+            subquery.c.is_done,
+        ).join(subquery, subquery.c.task_id == cls.id, isouter=True)
+
+        return tasks

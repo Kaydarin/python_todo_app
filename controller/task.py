@@ -1,7 +1,7 @@
 from flask import Blueprint, request, g, jsonify
 from sqlalchemy import func
 from config import db
-from models import Task, Todo
+from models import Task
 
 task = Blueprint("task", __name__)
 
@@ -12,21 +12,8 @@ def list_tasks():
     page = modifier.get("page", 1)
     limit = modifier.get("limit", 10)
 
-    subquery = (
-        db.session.query(Todo.id, Todo.task_id, Todo.title, Todo.is_done)
-        .filter(Todo.deleted_at == None)
-        .subquery("t")
-    )
-
     tasks = (
-        db.session.query(
-            Task.id,
-            Task.title,
-            subquery.c.id.label("todo_id"),
-            subquery.c.title.label("todo_title"),
-            subquery.c.is_done,
-        )
-        .join(subquery, subquery.c.task_id == Task.id, isouter=True)
+        Task.with_todo()
         .filter(Task.user_id == g.user_id, Task.deleted_at == None)
         .paginate(int(page), int(limit), False)
     )
@@ -81,21 +68,8 @@ def list_tasks():
 @task.get("/task/<task_id>")
 def get_task(task_id):
 
-    subquery = (
-        db.session.query(Todo.id, Todo.task_id, Todo.title, Todo.is_done)
-        .filter(Todo.deleted_at == None)
-        .subquery("t")
-    )
-
     task = (
-        db.session.query(
-            Task.id,
-            Task.title,
-            subquery.c.id.label("todo_id"),
-            subquery.c.title.label("todo_title"),
-            subquery.c.is_done,
-        )
-        .join(subquery, subquery.c.task_id == Task.id, isouter=True)
+        Task.with_todo()
         .filter(Task.id == task_id, Task.user_id == g.user_id, Task.deleted_at == None)
         .all()
     )

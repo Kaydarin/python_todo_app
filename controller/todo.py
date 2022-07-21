@@ -32,17 +32,9 @@ def list_todo():
 
 @todo.get("/todo/<todo_id>")
 def get_todo(todo_id):
-    todo = (
-        Todo.query.with_entities(Todo.id, Todo.task_id, Todo.title, Todo.is_done)
-        .join(Task, Task.id == Todo.task_id)
-        .filter(
-            Todo.id == todo_id,
-            Task.user_id == g.user_id,
-            Task.deleted_at == None,
-            Todo.deleted_at == None,
-        )
-        .one_or_none()
-    )
+    todo = Todo.with_task(
+        [Todo.id, Todo.task_id, Todo.title, Todo.is_done], todo_id, g.user_id
+    ).one_or_none()
 
     if todo is None:
         todo = {}
@@ -93,17 +85,7 @@ def update_todo():
     if todo_id is None or title is None:
         return ("Missing attribute", 422)
 
-    todo = (
-        Todo.query.with_entities(Todo.id, Todo.task_id)
-        .join(Task, Task.id == Todo.task_id)
-        .filter(
-            Todo.id == todo_id,
-            Task.user_id == g.user_id,
-            Task.deleted_at == None,
-            Todo.deleted_at == None,
-        )
-        .one_or_none()
-    )
+    todo = Todo.with_task([Todo.id, Todo.task_id], todo_id, g.user_id).one_or_none()
 
     if todo is None:
         return ({"message": "Todo is not exist"}, 400)
@@ -143,17 +125,9 @@ def mark_todo():
         if done not in [0, 1]:
             return ("Invalid value", 400)
 
-    todo = (
-        Todo.query.with_entities(Todo.id, Todo.task_id, Todo.is_done)
-        .join(Task, Task.id == Todo.task_id)
-        .filter(
-            Todo.id == todo_id,
-            Task.user_id == g.user_id,
-            Task.deleted_at == None,
-            Todo.deleted_at == None,
-        )
-        .one_or_none()
-    )
+    todo = Todo.with_task(
+        [Todo.id, Todo.task_id, Todo.is_done], todo_id, g.user_id
+    ).one_or_none()
 
     if todo is None:
         return ({"message": "Todo is not exist"}, 400)
@@ -188,17 +162,7 @@ def delete_todo():
     if todo_id is None:
         return ("Missing attribute", 422)
 
-    todo = (
-        Todo.query.with_entities(Todo.id, Todo.task_id)
-        .join(Task, Task.id == Todo.task_id)
-        .filter(
-            Todo.id == todo_id,
-            Task.user_id == g.user_id,
-            Task.deleted_at == None,
-            Todo.deleted_at == None,
-        )
-        .one_or_none()
-    )
+    todo = Todo.with_task([Todo.id, Todo.task_id], todo_id, g.user_id).one_or_none()
 
     if todo is None:
         return ({"message": "Todo is not exist"}, 400)
