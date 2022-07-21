@@ -5,3 +5,4 @@ docker-compose.yaml
 /__pycache__/
 /.vscode/
 /venv/
+README.md
