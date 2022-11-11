@@ -5,7 +5,7 @@ networks:
 
 services:
   app:
-    image: azimbarcove/python-todo:0.0.1
+    image: kaydarin/python-todo:0.0.1
     container_name: python-todo
     restart: always
     volumes:
